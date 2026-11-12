@@ -1,0 +1,22 @@
+# Ambiente virtual Python e caches
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Arquivos de vídeo e gravações confidenciais de reunião (NUNCA versionar)
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.mp3
+*.wav
+
+# Arquivos temporários do Office e sistema operacional
+~$*.docx
+~$*.xlsx
+.DS_Store
+Thumbs.db

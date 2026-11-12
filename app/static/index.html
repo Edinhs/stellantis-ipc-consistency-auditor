@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stellantis — Auditor de Consistência IPC (VFs × Planilhas)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Cabeçalho Simples e Limpo -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-emblem">
+          <span class="brand-dot"></span>
+          <span class="brand-text">STELLANTIS</span>
+        </div>
+        <div class="brand-divider"></div>
+        <div class="brand-titles">
+          <h1>Auditor de Especificações IPC</h1>
+          <p>Cruza automaticamente as <strong>VFs</strong> com as planilhas <strong>Indications</strong> e <strong>Parameters Table</strong> para evitar RARs</p>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <button class="btn btn-glass" onclick="toggleUploadSection()" id="btnToggleUpload">
+          📂 Trocar / Enviar Novos Arquivos
+        </button>
+        <a class="btn btn-emerald" href="/api/export/excel" target="_blank">
+          📊 Baixar Relatório Excel (.xlsx)
+        </a>
+        <a class="btn btn-rose" href="/api/export/pdf" target="_blank">
+          📑 Baixar Relatório PDF (.pdf)
+        </a>
+        <button class="btn btn-icon-only" onclick="toggleTheme()" id="themeToggleBtn" title="Alternar Tema Claro / Escuro">
+          🌙
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- PASSO 1: ENVIO MANUAL DE ARQUIVOS (Sempre claro e acessível) -->
+    <section id="uploadSection" class="upload-hero-card">
+      <div class="upload-hero-header">
+        <div>
+          <span class="step-badge">PASSO 1</span>
+          <h2>Envie os Arquivos do Seu Projeto para Análise</h2>
+          <p>O sistema lê as suas VFs (inclusive listas com mais de 1.000 páginas) e responde automaticamente às duas perguntas de auditoria do IPC:</p>
+          <div style="margin-top:8px;font-size:0.84rem;background:var(--bg-subtle);padding:10px 14px;border-radius:8px;border-left:4px solid var(--st-accent);">
+            <div>✅ <strong>1. VF chama Indications:</strong> <em>Todas as indicações das VFs que impactam IPC estão listadas dentro do documento de Indications? <strong>E vice-versa?</strong></em></div>
+            <div style="margin-top:4px;">✅ <strong>2. VF chama Parâmetros:</strong> <em>Todos os parâmetros <code>[SUPPLIER_EOL_2]</code> de IPC de cada VF estão listados no Parameters_Table? <strong>E vice-versa?</strong></em></div>
+          </div>
+        </div>
+        <div class="demo-actions">
+          <span class="demo-label">Ou carregue um exemplo pronto para testar:</span>
+          <button type="button" class="btn btn-outline-accent" onclick="runMockAudit('docx')">
+            ⚡ Exemplo Rápido (6 VFs)
+          </button>
+          <button type="button" class="btn btn-outline-accent" onclick="runLargeScaleAudit('pdf')">
+            📚 Exemplo Completo (1.215 Páginas / 45 VFs)
+          </button>
+        </div>
+      </div>
+
+      <!-- Formulário Principal: Upload Manual dos 3 tipos de arquivo -->
+      <form id="uploadForm" onsubmit="runUploadAudit(event)" class="upload-main-form">
+        <div class="project-name-row">
+          <label for="projectNameInput">Nome / Código do Projeto (opcional):</label>
+          <input type="text" id="projectNameInput" placeholder="Ex: Projeto 363 - IPC MY27, Projeto 376, etc." value="Meu Projeto IPC" />
+        </div>
+
+        <div class="upload-boxes-grid">
+          <!-- Caixa 1: VFs -->
+          <label class="upload-box" id="boxVf">
+            <div class="upload-box-num">Arquivo 1</div>
+            <div class="upload-box-icon">📘</div>
+            <div class="upload-box-title">Documento(s) de VF (<code>.docx</code> ou <code>.pdf</code>)</div>
+            <div class="upload-box-desc">Pode ser 1 arquivo único grande (1.000+ páginas) ou várias VFs separadas</div>
+            <div class="upload-file-status" id="vfFilesLabel">Clique para escolher no computador...</div>
+            <input type="file" id="vfFilesInput" multiple accept=".docx,.pdf" required onchange="updateFileBox('vfFilesInput','vfFilesLabel','boxVf')" />
+          </label>
+
+          <!-- Caixa 2: Planilha Indications -->
+          <label class="upload-box" id="boxInd">
+            <div class="upload-box-num">Arquivo 2</div>
+            <div class="upload-box-icon">🚨</div>
+            <div class="upload-box-title">Planilha de Indicações (<code>Indications.xlsx</code>)</div>
+            <div class="upload-box-desc">Planilha da Section C (HMI Requirements) com a lista de indicações e VFs</div>
+            <div class="upload-file-status" id="indFileLabel">Clique para escolher no computador...</div>
+            <input type="file" id="indFileInput" accept=".xlsx" required onchange="updateFileBox('indFileInput','indFileLabel','boxInd')" />
+          </label>
+
+          <!-- Caixa 3: Planilha Parameters Table -->
+          <label class="upload-box" id="boxPar">
+            <div class="upload-box-num">Arquivo 3</div>
+            <div class="upload-box-icon">⚙️</div>
+            <div class="upload-box-title">Planilha de Parâmetros (<code>Parameters_Table.xlsx</code>)</div>
+            <div class="upload-box-desc">Planilha da Section B (Software Requirements) com os parâmetros do IPC</div>
+            <div class="upload-file-status" id="parFileLabel">Clique para escolher no computador...</div>
+            <input type="file" id="parFileInput" accept=".xlsx" required onchange="updateFileBox('parFileInput','parFileLabel','boxPar')" />
+          </label>
+        </div>
+
+        <div class="upload-footer-bar">
+          <div class="folder-shortcut">
+            <span>📁 Prefere informar o caminho de uma pasta local/rede?</span>
+            <input type="text" id="folderPathInput" placeholder="Cole o caminho da pasta aqui (Ex: C:\Projetos\MeuProjeto)" />
+            <button type="button" class="btn btn-glass-dark" onclick="runFolderAudit()">Ler Pasta</button>
+          </div>
+
+          <button type="submit" class="btn btn-analyze-big">
+            🔍 Ler Arquivos e Verificar Consistência Agora
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Barra indicando qual projeto está sendo exibido no momento -->
+    <section class="active-project-bar">
+      <div class="active-project-left">
+        <span class="pulse-indicator"></span>
+        <span class="badge-mode" id="metaMode">PRONTO</span>
+        <strong id="metaProjectName">Carregando...</strong>
+      </div>
+      <div class="active-project-right" id="metaFilesInfo"></div>
+    </section>
+
+    <!-- PASSO 2: RESUMO SIMPLES E DIRETO (4 Cartões Fáceis de Entender) -->
+    <section class="simple-kpi-grid">
+      <!-- Card 1: Total de Problemas -->
+      <div class="simple-kpi-card card-highlight-danger" onclick="switchTab('tab-problems')">
+        <div class="simple-kpi-top">
+          <span class="simple-kpi-title">1. Total de Problemas Encontrados</span>
+          <span class="simple-pill pill-danger">Risco de RAR</span>
+        </div>
+        <div class="simple-kpi-number danger-text" id="kpiTotalRar">-</div>
+        <p class="simple-kpi-explain" id="kpiRarBreakdown">Itens que precisam ser alinhados antes de liberar ao fornecedor</p>
+      </div>
+
+      <!-- Card 2: Indicações HMI -->
+      <div class="simple-kpi-card" onclick="switchTab('tab-rule1')">
+        <div class="simple-kpi-top">
+          <span class="simple-kpi-title">2. VF chama Indications (e vice-versa)</span>
+          <span class="simple-pill" id="pillRule1Status">-</span>
+        </div>
+        <div class="simple-kpi-number" id="kpiRule1Issues">-</div>
+        <div class="simple-breakdown-list" id="kpiRule1SimpleList"></div>
+      </div>
+
+      <!-- Card 3: Parâmetros SW -->
+      <div class="simple-kpi-card" onclick="switchTab('tab-rule2')">
+        <div class="simple-kpi-top">
+          <span class="simple-kpi-title">3. VF chama Parâmetros [SUPPLIER_EOL_2] (e vice-versa)</span>
+          <span class="simple-pill" id="pillRule2Status">-</span>
+        </div>
+        <div class="simple-kpi-number" id="kpiRule2Issues">-</div>
+        <div class="simple-breakdown-list" id="kpiRule2SimpleList"></div>
+      </div>
+
+      <!-- Card 4: Resumo da Leitura -->
+      <div class="simple-kpi-card" onclick="switchTab('tab-vfs')">
+        <div class="simple-kpi-top">
+          <span class="simple-kpi-title">4. O Que o Sistema Leu</span>
+          <span class="simple-pill pill-ok" id="kpiConformityBadge">-</span>
+        </div>
+        <div class="simple-kpi-number" id="kpiVfsCount">-</div>
+        <div class="simple-breakdown-list" id="kpiReadSummaryList"></div>
+      </div>
+    </section>
+
+    <!-- Filtro Rápido por VF -->
+    <section class="vf-filter-bar">
+      <div class="vf-filter-label">🚘 Filtrar por VF específica:</div>
+      <div class="vf-pills-list" id="globalVfPills"></div>
+    </section>
+
+    <!-- PASSO 3: ABAS MUITO FÁCEIS DE ENTENDER -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" data-tab="tab-problems" onclick="switchTab('tab-problems')">
+        <span>🚨</span>
+        <span>O Que Precisa Ser Corrigido (Resumo)</span>
+        <span class="tab-badge" id="badgeProblems">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-rule1" onclick="switchTab('tab-rule1')">
+        <span>📋</span>
+        <span>1. Indicações (VF ↔ Planilha Indications)</span>
+        <span class="tab-badge neutral" id="badgeRule1">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-rule2" onclick="switchTab('tab-rule2')">
+        <span>⚙️</span>
+        <span>2. Parâmetros (VF ↔ Planilha Parameters)</span>
+        <span class="tab-badge neutral" id="badgeRule2">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-vfs" onclick="switchTab('tab-vfs')">
+        <span>📘</span>
+        <span>VFs Lidas no Documento</span>
+        <span class="tab-badge neutral" id="badgeVfs">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-filtered" onclick="switchTab('tab-filtered')">
+        <span>🛡️</span>
+        <span>Parâmetros Ignorados (PROXI / Outros Módulos)</span>
+        <span class="tab-badge neutral" id="badgeFiltered">0</span>
+      </button>
+    </nav>
+
+    <!-- ABA PRINCIPAL: O QUE PRECISA SER CORRIGIDO (Linguagem Simples e Direta) -->
+    <section id="tab-problems" class="tab-content active">
+      <div class="toolbar-card">
+        <div class="toolbar-top">
+          <div class="toolbar-desc">
+            <strong>Lista Direta de Correções:</strong> Aqui estão apenas as inconsistências encontradas entre as suas VFs e as duas planilhas. Corrigindo estes itens, você evita a abertura de RARs pelo fornecedor.
+          </div>
+          <div class="search-box">
+            <span>🔍</span>
+            <input type="search" id="probSearch" placeholder="Buscar por nome do item ou VF..." oninput="renderProblemsSummaryTable()" />
+          </div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th style="width:45px;text-align:center;">Feito</th>
+              <th>Onde está o Problema?</th>
+              <th>O que Aconteceu?</th>
+              <th>Nome da Indicação ou Parâmetro</th>
+              <th>VF</th>
+              <th>Explicação Simples</th>
+              <th>Como Corrigir</th>
+            </tr>
+          </thead>
+          <tbody id="problemsTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ABA DETALHADA 1: INDICAÇÕES -->
+    <section id="tab-rule1" class="tab-content">
+      <div class="toolbar-card">
+        <div class="toolbar-top">
+          <div class="toolbar-desc">
+            <strong>Conferência Completa de Indicações (`VF ↔ Planilha Indications`):</strong> O sistema ignora automaticamente a diferença entre ponto e espaço (ex.: <code>HAND BRAKE.V1</code> na VF é igual a <code>HAND BRAKE V1</code> na planilha).
+          </div>
+          <div class="search-box">
+            <span>🔍</span>
+            <input type="search" id="r1Search" placeholder="Buscar indicação ou VF..." oninput="renderRule1Table()" />
+          </div>
+        </div>
+
+        <div class="toolbar-chips-row">
+          <div class="chip-group" id="r1StatusChips">
+            <button class="filter-chip active" data-val="ALL" onclick="setChipFilter('r1StatusChips','r1FilterStatus','ALL',renderRule1Table)">📋 Mostrar Tudo</button>
+            <button class="filter-chip" data-val="ISSUES_ONLY" onclick="setChipFilter('r1StatusChips','r1FilterStatus','ISSUES_ONLY',renderRule1Table)">🚨 Apenas com Problema</button>
+            <button class="filter-chip" data-val="MISSING_IN_SHEET" onclick="setChipFilter('r1StatusChips','r1FilterStatus','MISSING_IN_SHEET',renderRule1Table)">❌ Falta na Planilha</button>
+            <button class="filter-chip" data-val="ORPHAN_IN_SHEET" onclick="setChipFilter('r1StatusChips','r1FilterStatus','ORPHAN_IN_SHEET',renderRule1Table)">👻 Sobrando na Planilha (Órfã)</button>
+            <button class="filter-chip" data-val="VF_MISMATCH" onclick="setChipFilter('r1StatusChips','r1FilterStatus','VF_MISMATCH',renderRule1Table)">⚠️ Código da VF Diferente</button>
+            <button class="filter-chip" data-val="OK" onclick="setChipFilter('r1StatusChips','r1FilterStatus','OK',renderRule1Table)">✅ Tudo Certo (OK)</button>
+          </div>
+          <input type="hidden" id="r1FilterStatus" value="ALL" />
+          <input type="hidden" id="r1FilterDirection" value="ALL" />
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Situação</th>
+              <th>Nome da Indicação</th>
+              <th>VF no Documento</th>
+              <th>VF na Planilha</th>
+              <th>Explicação</th>
+              <th>O que Fazer</th>
+            </tr>
+          </thead>
+          <tbody id="r1TableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ABA DETALHADA 2: PARÂMETROS -->
+    <section id="tab-rule2" class="tab-content">
+      <div class="toolbar-card">
+        <div class="toolbar-top">
+          <div class="toolbar-desc">
+            <strong>Conferência Completa de Parâmetros (`VF ↔ Planilha Parameters Table`):</strong> Analisa apenas os parâmetros onde <code>Component = IPC</code> e <code>Implementation = SUPPLIER EOL</code>.
+          </div>
+          <div class="search-box">
+            <span>🔍</span>
+            <input type="search" id="r2Search" placeholder="Buscar parâmetro ou VF..." oninput="renderRule2Table()" />
+          </div>
+        </div>
+
+        <div class="toolbar-chips-row">
+          <div class="chip-group" id="r2StatusChips">
+            <button class="filter-chip active" data-val="ALL" onclick="setChipFilter('r2StatusChips','r2FilterStatus','ALL',renderRule2Table)">📋 Mostrar Tudo</button>
+            <button class="filter-chip" data-val="ISSUES_ONLY" onclick="setChipFilter('r2StatusChips','r2FilterStatus','ISSUES_ONLY',renderRule2Table)">🚨 Apenas com Problema</button>
+            <button class="filter-chip" data-val="MISSING_IN_SHEET" onclick="setChipFilter('r2StatusChips','r2FilterStatus','MISSING_IN_SHEET',renderRule2Table)">❌ Falta na Planilha</button>
+            <button class="filter-chip" data-val="ORPHAN_IN_SHEET" onclick="setChipFilter('r2StatusChips','r2FilterStatus','ORPHAN_IN_SHEET',renderRule2Table)">👻 Sobrando na Planilha (Órfão)</button>
+            <button class="filter-chip" data-val="VALUE_MISMATCH_OR_EMPTY" onclick="setChipFilter('r2StatusChips','r2FilterStatus','VALUE_MISMATCH_OR_EMPTY',renderRule2Table)">⚠️ Valor First Trial Vazio/Diferente</button>
+            <button class="filter-chip" data-val="OK" onclick="setChipFilter('r2StatusChips','r2FilterStatus','OK',renderRule2Table)">✅ Tudo Certo (OK)</button>
+          </div>
+          <input type="hidden" id="r2FilterStatus" value="ALL" />
+          <input type="hidden" id="r2FilterDirection" value="ALL" />
+        </div>
+      </div>
+
+      <div class="table-card">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>Situação</th>
+              <th>Nome do Parâmetro</th>
+              <th>VF</th>
+              <th>Valor na VF vs. Planilha</th>
+              <th>Explicação</th>
+              <th>O que Fazer</th>
+            </tr>
+          </thead>
+          <tbody id="r2TableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ABA 4: VFs LIDAS NO DOCUMENTO -->
+    <section id="tab-vfs" class="tab-content">
+      <div class="toolbar-card">
+        <div class="toolbar-desc">
+          <strong>Conteúdo Extraído das VFs:</strong> Veja exatamente quais VFs, indicações e parâmetros o sistema encontrou dentro dos arquivos <code>.docx</code> ou <code>.pdf</code> enviados.
+        </div>
+      </div>
+      <div id="vfsExplorerContainer" class="vfs-grid"></div>
+    </section>
+
+    <!-- ABA 5: PARÂMETROS IGNORADOS (PROXI / OUTROS MÓDULOS) -->
+    <section id="tab-filtered" class="tab-content">
+      <div class="toolbar-card">
+        <div class="toolbar-desc">
+          <strong>Por que estes parâmetros foram ignorados?</strong> Nas VFs existem parâmetros do tipo <code>PROXI</code> (que vão para outro documento da Stellantis) ou de outros módulos (como <code>BCM</code> e <code>ORC</code>). O sistema separa esses itens automaticamente para não cobrar por engano que eles estejam na planilha do IPC.
+        </div>
+      </div>
+      <div class="table-card">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th>VF</th>
+              <th>Nome do Parâmetro</th>
+              <th>Valor (First Trial)</th>
+              <th>Módulo (Component)</th>
+              <th>Tipo (Implementation)</th>
+              <th>Motivo por ter sido ignorado</th>
+            </tr>
+          </thead>
+          <tbody id="filteredTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
